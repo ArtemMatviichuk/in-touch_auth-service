@@ -31,10 +31,6 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddAuthorization(opt =>
-    opt.AddPolicy("Administrator",
-    policy => policy.RequireClaim(ClaimTypes.Role, "Admin", "User, Admin", "Admin, User")));
-
 builder.Services
    .AddAuthentication(options =>
    {
@@ -69,6 +65,8 @@ builder.Services
         };
     });
 
+builder.Services.AddAuthorization();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -92,6 +90,7 @@ app.UseExceptionHandler(a => a.Run(async context =>
 }));
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

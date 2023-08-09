@@ -36,7 +36,7 @@ public class AuthController : ControllerBase
         return NoContent();
     }
 
-    [Authorize(Policy = "Administrator")]
+    [Authorize(Roles = "Admin")]
     [HttpHead("ValidateAdmin")]
     public IActionResult ValidateAdminRole()
     {

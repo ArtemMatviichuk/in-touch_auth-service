@@ -73,11 +73,8 @@ public class AuthenticationService : IAuthenticationService
         var tokenHandler = new JwtSecurityTokenHandler();
         var key = Encoding.ASCII.GetBytes(_configuration[AppConstants.TokenSecret]!);
 
-        var claims = new List<Claim>
-            {
-                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(ClaimTypes.Role, string.Join(",", roles.OrderBy(e => e!.Id).Select(e => e!.Name))),
-            };
+        var claims = new List<Claim>() { new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()) }
+                .Concat(roles.OrderBy(e => e!.Id).Select(e => new Claim(ClaimTypes.Role, e?.Name!)));
 
         var tokenDescription = new SecurityTokenDescriptor
         {
