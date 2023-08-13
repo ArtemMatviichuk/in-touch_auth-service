@@ -4,40 +4,26 @@ using AuthService.Common.Exceptions;
 using AuthService.Common.Helpers;
 using AuthService.Data.Entity;
 using AuthService.Data.Repositories.Interfaces;
+using AuthService.Security;
 using AuthService.Services.Interfaces;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Text;
+using System.Security.Cryptography;
 
 namespace AuthService.Services.Implementations;
 public class AuthenticationService : IAuthenticationService
 {
     private readonly IUserRepository _userRepository;
     private readonly IRoleRepository _roleRepository;
-    private readonly IConfiguration _configuration;
+    private readonly SecurityOptions _securityOptions;
 
-    public AuthenticationService(IUserRepository userRepository, IRoleRepository roleRepository, IConfiguration configuration)
+    public AuthenticationService(IUserRepository userRepository, IRoleRepository roleRepository,
+        SecurityOptions securityOptions)
     {
         _userRepository = userRepository;
         _roleRepository = roleRepository;
-        _configuration = configuration;
-    }
-
-    public async Task<TokenDto> Authenticate(UserAuthRequestDto dto)
-    {
-        var user = await _userRepository.Get(e => e.Email!.ToLower() == dto.Email!.ToLower());
-        if (user == null)
-        {
-            throw new NotFoundException("User not found");
-        }
-
-        if (!HashHelper.IsEqual(user.PasswordHash!, dto.Password!))
-        {
-            throw new AccessDeniedException("Wrong password");
-        }
-
-        return await GenerateJwtToken(user);
+        _securityOptions = securityOptions;
     }
 
     public async Task<TokenDto> Register(UserAuthRequestDto dto)
@@ -66,25 +52,43 @@ public class AuthenticationService : IAuthenticationService
         return await GenerateJwtToken(user);
     }
 
+    public async Task<TokenDto> Authenticate(UserAuthRequestDto dto)
+    {
+        var user = await _userRepository.Get(e => e.Email!.ToLower() == dto.Email!.ToLower());
+        if (user == null)
+        {
+            throw new NotFoundException("User not found");
+        }
+
+        if (!HashHelper.IsEqual(user.PasswordHash!, dto.Password!))
+        {
+            throw new AccessDeniedException("Wrong password");
+        }
+
+        return await GenerateJwtToken(user);
+    }
+
     private async Task<TokenDto> GenerateJwtToken(User user)
     {
         var roles = await _userRepository.GetUserRoles(user.Id);
-
-        var tokenHandler = new JwtSecurityTokenHandler();
-        var key = Encoding.ASCII.GetBytes(_configuration[AppConstants.TokenSecret]!);
-
         var claims = new List<Claim>() { new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()) }
                 .Concat(roles.OrderBy(e => e!.Id).Select(e => new Claim(ClaimTypes.Role, e?.Name!)));
 
-        var tokenDescription = new SecurityTokenDescriptor
-        {
-            Subject = new ClaimsIdentity(claims),
-            Expires = DateTime.UtcNow.AddDays(1),
-            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key),
-                 SecurityAlgorithms.HmacSha256Signature)
-        };
+        var rsa = RSA.Create();
+        var key = await File.ReadAllTextAsync(_securityOptions.PrivateKeyFilePath);
+        rsa.FromXmlString(key);
 
-        var token = tokenHandler.WriteToken(tokenHandler.CreateToken(tokenDescription));
+        var credentials = new SigningCredentials(new RsaSecurityKey(rsa), SecurityAlgorithms.RsaSha256);
+
+        var jwt = new JwtSecurityToken(new JwtHeader(credentials), new JwtPayload(
+            "webapi",
+            "webapi",
+            claims,
+            DateTime.UtcNow,
+            DateTime.UtcNow.AddDays(1)
+        ));
+
+        var token = new JwtSecurityTokenHandler().WriteToken(jwt);
         return new TokenDto(token);
     }
 }

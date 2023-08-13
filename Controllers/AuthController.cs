@@ -1,6 +1,5 @@
 using AuthService.Common.Dtos;
 using AuthService.Services.Interfaces;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AuthService.Controllers;
@@ -27,19 +26,5 @@ public class AuthController : ControllerBase
     {
         var tokenDto = await _authService.Authenticate(dto);
         return Ok(tokenDto);
-    }
-
-    [Authorize]
-    [HttpHead("ValidateToken")]
-    public IActionResult ValidateToken()
-    {
-        return NoContent();
-    }
-
-    [Authorize(Roles = "Admin")]
-    [HttpHead("ValidateAdmin")]
-    public IActionResult ValidateAdminRole()
-    {
-        return NoContent();
     }
 }

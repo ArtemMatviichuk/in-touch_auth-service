@@ -10,11 +10,18 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using AuthService.Common.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
-using System.Security.Claims;
+using AuthService.Security;
+using System.Security.Cryptography;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+var securityOptions = new SecurityOptions();
+builder.Configuration.Bind(nameof(SecurityOptions), securityOptions);
+builder.Services.AddSingleton(securityOptions);
+
+builder.Services.AddRsaKeys(securityOptions);
+
 builder.Services.AddDbContext<AuthContext>(opt => opt.UseSqlServer(
     builder.Configuration.GetConnectionString(AppConstants.ConnectionStringName)
 ));
@@ -32,36 +39,24 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services
-   .AddAuthentication(options =>
-   {
-       options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-       options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-   })
+   .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(cfg =>
     {
-        cfg.RequireHttpsMetadata = false;
-        cfg.SaveToken = true;
+        var rsa = RSA.Create();
+        var key = File.ReadAllText(securityOptions.PublicKeyFilePath);
+        rsa.FromXmlString(key);
+
         cfg.TokenValidationParameters = new TokenValidationParameters
         {
+            ValidateAudience = true,
+            ValidateIssuer = true,
+            ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(builder.Configuration[AppConstants.TokenSecret]!)),
-            ValidateIssuer = false,
-            ValidateAudience = false
-        };
 
-        cfg.Events = new JwtBearerEvents
-        {
-            OnMessageReceived = context =>
-            {
-                var accessToken = context.Request.Query["access_token"];
+            ValidIssuer = "in-touch",
+            ValidAudience = "in-touch",
 
-                if (!string.IsNullOrEmpty(accessToken))
-                {
-                    context.Token = accessToken;
-                }
-
-                return Task.CompletedTask;
-            }
+            IssuerSigningKey = new RsaSecurityKey(rsa),
         };
     });
 
