@@ -8,7 +8,7 @@ public class UserAuthRequestDto
     public string? Email { get; set; }
 
     [Required]
-    [MinLength(5)]
+    [MinLength(8)]
     [RegularExpression(@"^(?=.*[A-Z])(?=.*[!@#$&*])(?=.*[0-9])(?=.*[a-z]).{8,40}$",
         ErrorMessage = @"Not allowed password. Criteria:
 8-40 characters length

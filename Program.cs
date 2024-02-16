@@ -7,11 +7,12 @@ using AuthService.Data.Repositories.Interfaces;
 using AuthService.Data.Repositories.Implementations;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using System.Text;
 using AuthService.Common.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
 using AuthService.Security;
 using System.Security.Cryptography;
+using AuthService.AsyncDataServices;
+using AuthService.SyncDataServices.Grpc;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,8 +20,6 @@ var builder = WebApplication.CreateBuilder(args);
 var securityOptions = new SecurityOptions();
 builder.Configuration.Bind(nameof(SecurityOptions), securityOptions);
 builder.Services.AddSingleton(securityOptions);
-
-builder.Services.AddRsaKeys(securityOptions);
 
 builder.Services.AddDbContext<AuthContext>(opt => opt.UseSqlServer(
     builder.Configuration.GetConnectionString(AppConstants.ConnectionStringName)
@@ -32,6 +31,10 @@ builder.Services.AddTransient<IRoleRepository, RoleRepository>();
 
 // SERVICES
 builder.Services.AddTransient<IAuthenticationService, AuthenticationService>();
+
+builder.Services.AddSingleton<IMessageBusClient, MessageBusClient>();
+
+builder.Services.AddGrpc();
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -62,6 +65,17 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(builder =>
+    {
+        builder.WithOrigins("http://localhost:4200")
+            .AllowAnyMethod()
+            .AllowAnyHeader()
+            .AllowCredentials();
+    });
+});
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -69,6 +83,7 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+    builder.Services.AddRsaKeys(securityOptions);
 }
 
 app.UseExceptionHandler(a => a.Run(async context =>
@@ -85,10 +100,16 @@ app.UseExceptionHandler(a => a.Run(async context =>
 }));
 app.UseHttpsRedirection();
 
+app.UseCors();
+
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+app.MapGrpcService<GrpcUserService>();
+app.MapGet("/protos/users.proto", async context =>
+    await context.Response.WriteAsync(File.ReadAllText("Protos/platforms.proto")));
 
 await DbPreparator.PrepareDb(app, app.Configuration);
 

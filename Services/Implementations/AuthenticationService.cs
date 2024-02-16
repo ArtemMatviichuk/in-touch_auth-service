@@ -1,5 +1,7 @@
+using AuthService.AsyncDataServices;
 using AuthService.Common.Constants;
 using AuthService.Common.Dtos;
+using AuthService.Common.Dtos.MessageBusDtos;
 using AuthService.Common.Exceptions;
 using AuthService.Common.Helpers;
 using AuthService.Data.Entity;
@@ -16,13 +18,15 @@ public class AuthenticationService : IAuthenticationService
 {
     private readonly IUserRepository _userRepository;
     private readonly IRoleRepository _roleRepository;
+    private readonly IMessageBusClient _messageBusClient;
     private readonly SecurityOptions _securityOptions;
 
     public AuthenticationService(IUserRepository userRepository, IRoleRepository roleRepository,
-        SecurityOptions securityOptions)
+        IMessageBusClient messageBusClient, SecurityOptions securityOptions)
     {
         _userRepository = userRepository;
         _roleRepository = roleRepository;
+        _messageBusClient = messageBusClient;
         _securityOptions = securityOptions;
     }
 
@@ -48,6 +52,8 @@ public class AuthenticationService : IAuthenticationService
 
         await _userRepository.Add(user);
         await _roleRepository.SaveChanges();
+
+        PublishCreatedUser(user.Id);
 
         return await GenerateJwtToken(user);
     }
@@ -90,5 +96,17 @@ public class AuthenticationService : IAuthenticationService
 
         var token = new JwtSecurityTokenHandler().WriteToken(jwt);
         return new TokenDto(token);
+    }
+
+    private void PublishCreatedUser(int id)
+    {
+        try
+        {
+            _messageBusClient.PublishUser(new PublishUserDto() { Id = id });
+        }
+        catch (Exception)
+        {
+            Console.WriteLine($"--> Could not send RabbitMQ message");
+        }
     }
 }
