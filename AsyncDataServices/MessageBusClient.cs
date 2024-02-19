@@ -1,23 +1,28 @@
 using System.Text;
 using System.Text.Json;
-using AuthService.Common.Constants;
+using AuthService.AppSettingsOptions;
 using AuthService.Common.Dtos.MessageBusDtos;
 using RabbitMQ.Client;
 
 namespace AuthService.AsyncDataServices;
 public class MessageBusClient : IMessageBusClient
 {
-    private readonly IConfiguration _configuration;
+    private readonly RabbitMQOptions _options;
+
     private readonly IConnection? _connection;
     private readonly IModel? _channel;
 
-    public MessageBusClient(IConfiguration configuration)
+    public MessageBusClient(RabbitMQOptions options)
     {
-        _configuration = configuration;
+        _options = options;
+
         var factory = new ConnectionFactory()
         {
-            HostName = _configuration[AppConstants.RabbitMQHost],
-            Port = int.Parse(_configuration[AppConstants.RabbitMQPort]!)
+            HostName = _options.Host,
+            Port = int.Parse(_options.Port),
+            ClientProvidedName = _options.ClientProvidedName,
+            UserName = _options.UserName,
+            Password = _options.Password,
         };
 
         try
@@ -25,7 +30,9 @@ public class MessageBusClient : IMessageBusClient
             _connection = factory.CreateConnection();
             _channel = _connection.CreateModel();
 
-            _channel.ExchangeDeclare(exchange: "trigger", type: ExchangeType.Fanout);
+            _channel.ExchangeDeclare(_options.Exchange, ExchangeType.Direct);
+            _channel.QueueDeclare(_options.QueueName, false, false, false, null);
+            _channel.QueueBind(_options.QueueName, _options.Exchange, _options.RoutingKey, null);
 
             _connection.ConnectionShutdown += RabbitMQ_ConnectionShutdown;
         }
@@ -58,10 +65,10 @@ public class MessageBusClient : IMessageBusClient
             var body = Encoding.UTF8.GetBytes(message);
 
             _channel.BasicPublish(
-                exchange: "trigger",
-                routingKey: "",
+                _options.Exchange,
+                _options.RoutingKey,
                 basicProperties: null,
-                body: body
+                body
             );
         }
     }

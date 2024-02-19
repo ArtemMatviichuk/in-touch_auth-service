@@ -1,5 +1,6 @@
 using System.Text;
 using System.Security.Cryptography;
+using AuthService.AppSettingsOptions;
 
 namespace AuthService.Security;
 public static class SecurityOptionsInjector

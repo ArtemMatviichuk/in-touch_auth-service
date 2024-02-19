@@ -1,3 +1,4 @@
+using AuthService.AppSettingsOptions;
 using AuthService.AsyncDataServices;
 using AuthService.Common.Constants;
 using AuthService.Common.Dtos;
@@ -6,7 +7,6 @@ using AuthService.Common.Exceptions;
 using AuthService.Common.Helpers;
 using AuthService.Data.Entity;
 using AuthService.Data.Repositories.Interfaces;
-using AuthService.Security;
 using AuthService.Services.Interfaces;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;

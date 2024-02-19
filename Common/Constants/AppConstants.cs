@@ -5,7 +5,4 @@ public static class AppConstants
     public const string TokenSecret = "TokenSecret";
     public const string AdminEmail = "AdminEmail";
     public const string AdminPassword = "AdminPassword";
-
-    public const string RabbitMQHost = "RabbitMQHost";
-    public const string RabbitMQPort = "RabbitMQPort";
 }
