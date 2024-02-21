@@ -39,5 +39,10 @@ namespace AuthService.Common.Helpers
 
             return true;
         }
+
+        public static string GenerateVerificationCode()
+        {
+            return new Random().Next(0, 1000000).ToString("### ###");
+        }
     }
 }

@@ -4,17 +4,19 @@ using AuthService.AppSettingsOptions;
 using AuthService.Common.Dtos.MessageBusDtos;
 using RabbitMQ.Client;
 
-namespace AuthService.AsyncDataServices;
-public class MessageBusClient : IMessageBusClient
+namespace AuthService.AsyncDataServices.Auth;
+public class EmailMessageBusClient : IEmailMessageBusClient
 {
     private readonly RabbitMQOptions _options;
+    private readonly ILogger<EmailMessageBusClient> _logger;
 
     private readonly IConnection? _connection;
     private readonly IModel? _channel;
 
-    public MessageBusClient(RabbitMQOptions options)
+    public EmailMessageBusClient(RabbitMQOptions options, ILogger<EmailMessageBusClient> logger)
     {
         _options = options;
+        _logger = logger;
 
         var factory = new ConnectionFactory()
         {
@@ -30,19 +32,19 @@ public class MessageBusClient : IMessageBusClient
             _connection = factory.CreateConnection();
             _channel = _connection.CreateModel();
 
-            _channel.ExchangeDeclare(_options.Exchange, ExchangeType.Direct);
-            _channel.QueueDeclare(_options.QueueName, false, false, false, null);
-            _channel.QueueBind(_options.QueueName, _options.Exchange, _options.RoutingKey, null);
+            _channel.ExchangeDeclare(_options.Email.Exchange, ExchangeType.Direct);
+            _channel.QueueDeclare(_options.Email.QueueName, false, false, false, null);
+            _channel.QueueBind(_options.Email.QueueName, _options.Email.Exchange, _options.Email.RoutingKey, null);
 
             _connection.ConnectionShutdown += RabbitMQ_ConnectionShutdown;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"--> Could not connect to the message bus: {ex.Message}");
+            _logger.LogError($"Could not connect to the message bus: {ex.Message}");
         }
     }
 
-    public void PublishUser(PublishUserDto dto)
+    public void SendEmailConfirmationMessage(VerifyEmailDto dto)
     {
         var message = JsonSerializer.Serialize(dto);
 
@@ -64,17 +66,21 @@ public class MessageBusClient : IMessageBusClient
         {
             var body = Encoding.UTF8.GetBytes(message);
 
-            _channel.BasicPublish(
-                _options.Exchange,
-                _options.RoutingKey,
+            _channel?.BasicPublish(
+                _options.Email.Exchange,
+                _options.Email.RoutingKey,
                 basicProperties: null,
                 body
             );
+        }
+        else
+        {
+            _logger.LogWarning($"Message has not been sent because connection does not exist or is not open");
         }
     }
 
     private void RabbitMQ_ConnectionShutdown(object? sender, ShutdownEventArgs e)
     {
-        Console.WriteLine("--> RabbitMQ connection shutdown");
+        _logger.LogInformation($"RabbitMQ connection shutdown");
     }
 }

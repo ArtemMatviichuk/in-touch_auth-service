@@ -1,7 +1,7 @@
 using AuthService.Common.Dtos.MessageBusDtos;
 
-namespace AuthService.AsyncDataServices;
-public interface IMessageBusClient
+namespace AuthService.AsyncDataServices.Auth;
+public interface IAuthMessageBusClient
 {
     void PublishUser(PublishUserDto dto);
 }

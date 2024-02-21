@@ -11,9 +11,9 @@ using AuthService.Common.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
 using AuthService.Security;
 using System.Security.Cryptography;
-using AuthService.AsyncDataServices;
 using AuthService.SyncDataServices.Grpc;
 using AuthService.AppSettingsOptions;
+using AuthService.AsyncDataServices.Auth;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -33,11 +33,13 @@ builder.Services.AddDbContext<AuthContext>(opt => opt.UseSqlServer(
 // REPOSITORIES
 builder.Services.AddTransient<IUserRepository, UserRepository>();
 builder.Services.AddTransient<IRoleRepository, RoleRepository>();
+builder.Services.AddTransient<IEmailVerificationRepository, EmailVerificationRepository>();
 
 // SERVICES
 builder.Services.AddTransient<IAuthenticationService, AuthenticationService>();
 
-builder.Services.AddSingleton<IMessageBusClient, MessageBusClient>();
+builder.Services.AddSingleton<IAuthMessageBusClient, AuthMessageBusClient>();
+builder.Services.AddSingleton<IEmailMessageBusClient, EmailMessageBusClient>();
 
 builder.Services.AddGrpc();
 
