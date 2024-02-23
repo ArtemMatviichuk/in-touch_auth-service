@@ -1,19 +1,21 @@
-using AuthService.Common.Constants;
-using AuthService.Data;
-using AuthService.Services.Interfaces;
-using AuthService.Services.Implementations;
+using System.Security.Cryptography;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using AuthService.AppSettingsOptions;
+using AuthService.Common.Constants;
+using AuthService.Common.Exceptions;
+using AuthService.Data;
 using AuthService.Data.Repositories.Interfaces;
 using AuthService.Data.Repositories.Implementations;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
-using AuthService.Common.Exceptions;
-using Microsoft.AspNetCore.Diagnostics;
+using AuthService.Services.Interfaces;
+using AuthService.Services.Implementations;
 using AuthService.Security;
-using System.Security.Cryptography;
 using AuthService.SyncDataServices.Grpc;
-using AuthService.AppSettingsOptions;
-using AuthService.AsyncDataServices.Auth;
+using AuthService.AsyncDataServices.Interfaces;
+using AuthService.AsyncDataServices.Implementations;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -38,15 +40,43 @@ builder.Services.AddTransient<IEmailVerificationRepository, EmailVerificationRep
 // SERVICES
 builder.Services.AddTransient<IAuthenticationService, AuthenticationService>();
 
-builder.Services.AddSingleton<IAuthMessageBusClient, AuthMessageBusClient>();
-builder.Services.AddSingleton<IEmailMessageBusClient, EmailMessageBusClient>();
+builder.Services.AddSingleton<IRabbitMqConnection, RabbitMqConnection>();
+
+builder.Services.AddTransient<IAuthMessageBusClient, AuthMessageBusClient>();
+builder.Services.AddTransient<IEmailMessageBusClient, EmailMessageBusClient>();
 
 builder.Services.AddGrpc();
 
 builder.Services.AddControllers();
+
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(opt =>
+{
+    opt.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Type = SecuritySchemeType.Http,
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Scheme = "Bearer",
+
+    });
+
+    opt.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Id = "Bearer",
+                    Type = ReferenceType.SecurityScheme,
+                }
+            },
+            new string[]{}
+        }
+    });
+});
 
 builder.Services
    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -63,8 +93,8 @@ builder.Services
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
 
-            ValidIssuer = "in-touch",
-            ValidAudience = "in-touch",
+            ValidIssuer = securityOptions.Issuer,
+            ValidAudience = securityOptions.Audience,
 
             IssuerSigningKey = new RsaSecurityKey(rsa),
         };
@@ -90,6 +120,7 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+
     builder.Services.AddRsaKeys(securityOptions);
 }
 

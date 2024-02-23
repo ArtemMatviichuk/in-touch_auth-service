@@ -1,5 +1,5 @@
 using AuthService.AppSettingsOptions;
-using AuthService.AsyncDataServices.Auth;
+using AuthService.AsyncDataServices.Interfaces;
 using AuthService.Common.Constants;
 using AuthService.Common.Dtos;
 using AuthService.Common.Dtos.MessageBusDtos;
@@ -158,7 +158,7 @@ public class AuthenticationService : IAuthenticationService
 
         try
         {
-            _emailBusClient.SendEmailConfirmationMessage(dto);
+            _emailBusClient.SendMessage(dto);
         }
         catch (Exception ex)
         {
@@ -217,8 +217,8 @@ public class AuthenticationService : IAuthenticationService
         var credentials = new SigningCredentials(new RsaSecurityKey(rsa), SecurityAlgorithms.RsaSha256);
 
         var jwt = new JwtSecurityToken(new JwtHeader(credentials), new JwtPayload(
-            "webapi",
-            "webapi",
+            _securityOptions.Issuer,
+            _securityOptions.Audience,
             claims,
             DateTime.UtcNow,
             DateTime.UtcNow.AddDays(1)
@@ -232,7 +232,7 @@ public class AuthenticationService : IAuthenticationService
     {
         try
         {
-            _authBusClient.PublishUser(new PublishUserDto() { Id = id });
+            _authBusClient.SendMessage(new PublishUserDto() { Id = id });
         }
         catch (Exception ex)
         {
