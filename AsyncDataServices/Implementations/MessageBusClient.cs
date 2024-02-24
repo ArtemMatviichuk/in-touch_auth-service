@@ -29,8 +29,7 @@ namespace AuthService.AsyncDataServices.Implementations
         {
             if (!_connection.IsOpen())
             {
-                _logger.LogWarning($"Message has not been sent because connection does not exist or is not open");
-                return;
+                throw new Exception($"Message has not been sent because connection does not exist or is not open");
             }
 
             var message = JsonSerializer.Serialize(data);

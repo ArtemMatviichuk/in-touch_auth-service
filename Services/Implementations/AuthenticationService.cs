@@ -2,7 +2,6 @@ using AuthService.AppSettingsOptions;
 using AuthService.AsyncDataServices.Interfaces;
 using AuthService.Common.Constants;
 using AuthService.Common.Dtos;
-using AuthService.Common.Dtos.MessageBusDtos;
 using AuthService.Common.Exceptions;
 using AuthService.Common.Helpers;
 using AuthService.Data.Entity;
@@ -20,23 +19,20 @@ public class AuthenticationService : IAuthenticationService
     private readonly IRoleRepository _roleRepository;
     private readonly IEmailVerificationRepository _emailVerificationRepository;
 
-    private readonly IAuthMessageBusClient _authBusClient;
-    private readonly IEmailMessageBusClient _emailBusClient;
+    private readonly IMessagePublisher _publisher;
     private readonly SecurityOptions _securityOptions;
 
     private readonly ILogger<AuthenticationService> _logger;
 
     public AuthenticationService(IUserRepository userRepository, IRoleRepository roleRepository,
         IEmailVerificationRepository emailVerificationRepository, SecurityOptions securityOptions,
-        IAuthMessageBusClient authBusClient, IEmailMessageBusClient emailBusClient,
-        ILogger<AuthenticationService> logger)
+        IMessagePublisher publisher, ILogger<AuthenticationService> logger)
     {
         _userRepository = userRepository;
         _roleRepository = roleRepository;
         _emailVerificationRepository = emailVerificationRepository;
 
-        _authBusClient = authBusClient;
-        _emailBusClient = emailBusClient;
+        _publisher = publisher;
         _securityOptions = securityOptions;
 
         _logger = logger;
@@ -72,8 +68,8 @@ public class AuthenticationService : IAuthenticationService
         await _userRepository.Add(user);
         await _roleRepository.SaveChanges();
 
-        PublishCreatedUser(user.Id);
-        await SendVerificationEmail(user.Id);
+        _publisher.PublishCreatedUser(user.Id);
+        _publisher.PublishEmailVerification(user.Email!, user.Verification.Code, user.Verification.ValidTo);
 
         return await GenerateJwtToken(user);
     }
@@ -134,7 +130,7 @@ public class AuthenticationService : IAuthenticationService
         }
     }
 
-    public async Task SendVerificationEmail(int userId)
+    public async Task<ValueDto<DateTime>> SendVerificationEmail(int userId)
     {
         var user = await _userRepository.Get(userId);
         if (user == null)
@@ -146,24 +142,23 @@ public class AuthenticationService : IAuthenticationService
         if (string.IsNullOrWhiteSpace(user.Email))
             throw new ValidationException("Empty email address");
 
-        var verification = await _emailVerificationRepository.GetByUserId(userId);
-        if (verification == null)
-            throw new NotFoundException("Email verification data not found");
+        var existing = await _emailVerificationRepository.GetByUserId(userId);
+        if (existing != null)
+            _emailVerificationRepository.Remove(existing);
 
-        VerifyEmailDto dto = new()
+        var verification = new EmailVerification()
         {
-            Email = user.Email,
-            VerificationCode = verification.Code,
+            Code = HashHelper.GenerateVerificationCode(),
+            ValidTo = DateTime.UtcNow.AddHours(1),
+            UserId = userId,
         };
 
-        try
-        {
-            _emailBusClient.SendMessage(dto);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError($"Could not send RabbitMQ message: \n{ex.Message}");
-        }
+        await _emailVerificationRepository.Add(verification);
+        await _emailVerificationRepository.SaveChanges();
+
+        _publisher.PublishEmailVerification(user.Email, verification.Code, verification.ValidTo);
+
+        return new ValueDto<DateTime>(verification.ValidTo);
     }
 
     public async Task VerifyEmail(int userId, string code)
@@ -185,11 +180,14 @@ public class AuthenticationService : IAuthenticationService
         if (verification == null)
             throw new NotFoundException("Email verification data not found");
 
+        if (verification.ValidTo < DateTime.UtcNow)
+            throw new ValidationException("The code has expired");
+
         if (verification.Code.ToLower() != code.ToLower())
             throw new ValidationException("Invalid verification code");
 
         user.IsEmailVerified = true;
-        
+
         _emailVerificationRepository.Remove(verification);
         await _emailVerificationRepository.SaveChanges();
     }
@@ -201,6 +199,18 @@ public class AuthenticationService : IAuthenticationService
             throw new NotFoundException("User not found");
 
         return new ValueDto<bool>(user.IsEmailVerified);
+    }
+
+    public async Task RemoveAccount(int userId)
+    {
+        var user = await _userRepository.Get(userId);
+        if (user == null)
+            throw new NotFoundException("User not found");
+
+        await _userRepository.Remove(userId);
+        await _userRepository.SaveChanges();
+
+        _publisher.PublishRemovedUser(userId);
     }
 
     private async Task<TokenDto> GenerateJwtToken(User user)
@@ -226,17 +236,5 @@ public class AuthenticationService : IAuthenticationService
 
         var token = new JwtSecurityTokenHandler().WriteToken(jwt);
         return new TokenDto(token);
-    }
-
-    private void PublishCreatedUser(int id)
-    {
-        try
-        {
-            _authBusClient.SendMessage(new PublishUserDto() { Id = id });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError($"Could not send RabbitMQ message: \n{ex.Message}");
-        }
     }
 }

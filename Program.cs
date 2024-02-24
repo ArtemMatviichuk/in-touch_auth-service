@@ -44,6 +44,7 @@ builder.Services.AddSingleton<IRabbitMqConnection, RabbitMqConnection>();
 
 builder.Services.AddTransient<IAuthMessageBusClient, AuthMessageBusClient>();
 builder.Services.AddTransient<IEmailMessageBusClient, EmailMessageBusClient>();
+builder.Services.AddTransient<IMessagePublisher, MessagePublisher>();
 
 builder.Services.AddGrpc();
 
@@ -121,7 +122,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 
-    builder.Services.AddRsaKeys(securityOptions);
+    //builder.Services.AddRsaKeys(securityOptions);
 }
 
 app.UseExceptionHandler(a => a.Run(async context =>

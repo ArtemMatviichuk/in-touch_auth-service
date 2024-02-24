@@ -45,9 +45,9 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> SendVerificationEmail()
     {
         int userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        await _authService.SendVerificationEmail(userId);
+        var response = await _authService.SendVerificationEmail(userId);
 
-        return NoContent();
+        return Ok(response);
     }
 
     [Authorize]
@@ -68,5 +68,15 @@ public class AuthController : ControllerBase
         var response = await _authService.CheckIfEmailVerified(userId);
 
         return Ok(response);
+    }
+
+    [Authorize]
+    [HttpDelete("Account")]
+    public async Task<IActionResult> RemoveAccount()
+    {
+        int userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        await _authService.RemoveAccount(userId);
+
+        return NoContent();
     }
 }
