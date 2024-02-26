@@ -17,11 +17,11 @@ namespace AuthService.AsyncDataServices.Implementations
             _logger = logger;
         }
 
-        public void PublishCreatedUser(int id)
+        public void PublishCreatedUser(int id, string publicId)
         {
             try
             {
-                _authBusClient.SendMessage(new CreatedUserDto() { Id = id });
+                _authBusClient.SendMessage(new CreatedUserDto() { Id = id, PublicId = publicId });
             }
             catch (Exception ex)
             {

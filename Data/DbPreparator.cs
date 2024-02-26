@@ -21,6 +21,7 @@ public static class DbPreparator
         {
             var admin = new User()
             {
+                PublicId = HashHelper.GenerateGUID(),
                 Email = configuration[AppConstants.AdminEmail],
                 PasswordHash = HashHelper.GetHashFromString(configuration[AppConstants.AdminPassword]!),
                 RegisteredDate = DateTime.UtcNow,

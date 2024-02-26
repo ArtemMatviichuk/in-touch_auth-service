@@ -50,6 +50,7 @@ public class AuthenticationService : IAuthenticationService
         var role = await _roleRepository.Get(e => e.Value == UserRelatedConstants.UserRoleValue);
         user = new User()
         {
+            PublicId = HashHelper.GenerateGUID(),
             Email = dto.Email,
             PasswordHash = HashHelper.GetHashFromString(dto.Password!),
             RegisteredDate = dateNow,
@@ -68,7 +69,7 @@ public class AuthenticationService : IAuthenticationService
         await _userRepository.Add(user);
         await _roleRepository.SaveChanges();
 
-        _publisher.PublishCreatedUser(user.Id);
+        _publisher.PublishCreatedUser(user.Id, user.PublicId);
         _publisher.PublishEmailVerification(user.Email!, user.Verification.Code, user.Verification.ValidTo);
 
         return await GenerateJwtToken(user);

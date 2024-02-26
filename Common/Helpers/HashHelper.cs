@@ -44,5 +44,10 @@ namespace AuthService.Common.Helpers
         {
             return new Random().Next(0, 1000000).ToString("### ###");
         }
+
+        public static string GenerateGUID()
+        {
+            return Guid.NewGuid().ToString();
+        }
     }
 }
