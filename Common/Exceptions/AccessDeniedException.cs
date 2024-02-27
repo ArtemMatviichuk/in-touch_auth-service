@@ -2,6 +2,8 @@
 {
     public class AccessDeniedException : CustomException
     {
+        public override int StatusCode => 403;
+
         public AccessDeniedException()
         {
         }

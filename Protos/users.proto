@@ -10,6 +10,7 @@ message GetAllRequest {}
 
 message GrpcUserModel {
     int32 userId = 1;
+    string publicId = 2;
 }
 
 message GetAllResponse {

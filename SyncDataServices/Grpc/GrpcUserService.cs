@@ -19,7 +19,7 @@ namespace AuthService.SyncDataServices.Grpc
 
             foreach (var user in users)
             {
-                response.Users.Add(new GrpcUserModel() { UserId = user.Id });
+                response.Users.Add(new GrpcUserModel() { UserId = user.Id, PublicId = user.PublicId });
             }
 
             return response;
