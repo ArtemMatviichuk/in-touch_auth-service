@@ -42,8 +42,8 @@ builder.Services.AddTransient<IAuthenticationService, AuthenticationService>();
 
 builder.Services.AddSingleton<IRabbitMqConnection, RabbitMqConnection>();
 
-builder.Services.AddTransient<IAuthMessageBusClient, AuthMessageBusClient>();
-builder.Services.AddTransient<IEmailMessageBusClient, EmailMessageBusClient>();
+builder.Services.AddScoped<IAuthMessageBusClient, AuthMessageBusClient>();
+builder.Services.AddScoped<IEmailMessageBusClient, EmailMessageBusClient>();
 builder.Services.AddTransient<IMessagePublisher, MessagePublisher>();
 
 builder.Services.AddGrpc();
